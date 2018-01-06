@@ -6,6 +6,7 @@ Extension of pdfminer to read bank statements.
 """
 
 from re import sub
+from decimal import Decimal
 from collections import namedtuple
 from itertools import groupby
 from operator import itemgetter
@@ -79,17 +80,18 @@ class Miner_DB(Miner):
             pass
 
         # Exchange ',' -> '.' and omit 'EUR'
-        def convert_EUR(v):
-            return sub(r'([0-9-]*),([0-9]*).*', r'\1.\2', v)
+        def text2value(t):
+            v = sub(r'(-?)\s*([0-9-]*),([0-9]*).*', r'\1\2.\3', t)
+            return Decimal(v)
 
-        self.val['quantity'] = convert_EUR(item_list[itm_idx + 4].text)
+        self.val['quantity'] = text2value(item_list[itm_idx + 4].text)
         self.val['WKN'] = item_list[itm_idx + 5].text
         self.val['ISIN'] = item_list[itm_idx + 6].text
         self.val['name'] = item_list[itm_idx + 7].text
 
         # Define search parameters and create dict{line#, key}
-        sp = {'dividend': 'Bruttoertrag', 'KESt': 'Kapitalertragsteuer (KESt)', 'QuSt': '% Ausländische Quellensteuer',
-              'SolZ': 'Solidaritätszuschlag auf KESt', 'bank': 'Gutschrift mit Wert'}
+        sp = {'Dividend': 'Bruttoertrag', 'KESt': 'Kapitalertragsteuer (KESt)', 'QuSt': '% Ausländische Quellensteuer',
+              'SolZ': 'Solidaritätszuschlag auf KESt', 'Bank': 'Gutschrift mit Wert'}
         lines = {itm.y: s for s in sp for itm in item_list if sp[s] in itm.text}
 
         # Group items by line
@@ -97,5 +99,5 @@ class Miner_DB(Miner):
             if k in lines:
                 itm = next(reversed(list(g))) # last element in line
                 key = lines[k] # translate line#
-                self.val[key] = convert_EUR(itm.text)
+                self.val[key] = text2value(itm.text)
 
